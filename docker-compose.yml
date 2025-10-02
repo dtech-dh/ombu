@@ -1,0 +1,9 @@
+services:
+  ombu:
+    build: .
+    container_name: ombu
+    env_file: .env
+    volumes:
+      - ./credentials/service_account.json:/app/credentials.json:ro
+      - ./out:/app/out 
+    restart: "no"

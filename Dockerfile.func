@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+ENV TZ=America/Argentina/Cordoba
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates tzdata locales && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN sed -i '/es_AR.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
+ENV LANG=es_AR.UTF-8
+ENV LC_ALL=es_AR.UTF-8
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 👇 Copiamos el código DENTRO de /app/app para que sea un paquete "app"
+COPY app/ /app/app/
+
+# Ejecutamos como módulo de paquete
+CMD ["python", "-m", "app.main"]
