@@ -538,6 +538,8 @@ def build_prompt_from_dataframe(df: pd.DataFrame) -> str:
     """
     Construye el prompt a partir del DF original (lee/limpia/filtra/ventana),
     calcula métricas y adjunta pistas determinísticas de riesgo + logística.
+    Devuelve un prompt que instruye al LLM a producir **texto narrativo en español**,
+    no JSON.
     """
     base_df, meta = _prepare_analysis_df(df)
 
@@ -563,29 +565,31 @@ def build_prompt_from_dataframe(df: pd.DataFrame) -> str:
 
     json_blob = json.dumps(metrics, ensure_ascii=False, separators=(",", ":"), default=_json_default)
 
-    header = (
-        f"La base de análisis son los últimos {metrics.get('lookback_days')} días "
-        f"({metrics['base_period']['start']} → {metrics['base_period']['end']})."
-    )
-
-    # === Instrucciones al modelo ===
+    # === Instrucciones al modelo (claras y finales) ===
+    # Indicamos que el JSON es solo referencia interna y pedimos un correo en castellano.
     prompt = f"""
-{header}
-Tenés métricas de ventas en formato JSON (Argentina, lenguaje español). Pensá paso a paso internamente y **devolvé sólo** el resultado final en el formato solicitado.
+Generá un **correo** breve y profesional en **español** (Argentina), usando el símbolo de moneda "{settings.CURRENCY}" con separadores de miles y dos decimales.
+**NO** devuelvas JSON, **NO** devuelvas código, **NO** uses bloques ```; devolvé **solo el texto del correo**.
 
-JSON:
-{json_blob}
+Estructura esperada (subtítulos en negrita):
+- **Resumen**: 1–2 frases con lo más importante del período.
+- **Clientes**: cantidad de clientes; frecuencia de compra (mediana de días entre pedidos y promedio de pedidos por cliente).
+- **Logística**:
+  - Rendimiento por camión: ingresos totales, viajes, promedio por viaje, paradas medianas.
+  - Cadencia de visitas: mediana de días entre viajes; y por camión, top clientes con mediana de días entre visitas y días desde la última visita (si aplica).
+- **Riesgos**: sintetizá si hay señales de riesgo (cuentas por cobrar/aging, top vencidos). Si no hay datos, escribí "No hay datos suficientes".
 
 Reglas importantes:
-- No inventes datos ni placeholders. Si una sección no tiene datos suficientes, escribí: "No hay datos suficientes".
-- Usá el símbolo de moneda "{settings.CURRENCY}" y separadores de miles.
-- Analizá **solo** productos marca "Dos Hermanos" (el dataset ya fue filtrado a esa marca).
-- Reportá **cantidad de clientes** que compran y **frecuencia de compra** (mediana de días entre pedidos por cliente y promedio de pedidos por cliente).
-- Añadí una sección **Logística** con: (a) rendimiento por camión (ingresos totales, viajes y promedio por viaje; paradas medianas), y (b) cadencia de visitas (mediana de días entre viajes por camión y, por camión, top clientes con mediana de días entre visitas y días desde la última visita).
-- Si hay pistas de **riesgo determinístico**, incorporalas en la sección de Riesgos sin repetir números innecesariamente.
+- No inventes datos ni placeholders.
+- Usá un tono claro, conservador y profesional.
+- Si una sección no tiene datos, indicá "No hay datos suficientes".
+- No repitas el JSON ni cifras redundantes; priorizá la lectura ejecutiva.
 
+Datos (referencia interna; **no los devuelvas**):
+{json_blob}
+
+Pistas internas de riesgo (no las copies literal, usalas para enriquecer la sección de Riesgos):
+{risk_md}
 """.strip()
 
-    # Pistas determinísticas (riesgo) al final del prompt como referencia
-    prompt += "\n\n" + risk_md
     return prompt
