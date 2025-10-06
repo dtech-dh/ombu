@@ -9,5 +9,5 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 COPY --from=builder /root/.local /root/.local
-COPY src/ ./src
-CMD ["python", "src/app.main.py"]
+COPY ./src/. ./
+CMD ["python", "app/main.py"]
