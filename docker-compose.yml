@@ -1,6 +1,6 @@
 services:
   ombu:
-    image: ombu:latest
+    image: dtechdhgr/ombu:latest
     container_name: ombu
     env_file: .env
     volumes:
