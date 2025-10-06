@@ -10,4 +10,4 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1
 COPY --from=builder /root/.local /root/.local
 COPY ./src/. ./
-CMD ["python", "app/main.py"]
+CMD ["python", '-m', "main"]

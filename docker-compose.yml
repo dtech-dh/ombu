@@ -1,6 +1,6 @@
 services:
   ombu:
-    build: .
+    image: ombu:latest
     container_name: ombu
     env_file: .env
     volumes:
