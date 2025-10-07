@@ -42,6 +42,10 @@ jobs:
             echo "❌ Falta GH_PAT"
             missing=1
           fi
+          if [ -z "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" ]; then
+            echo "❌ Falta GOOGLE_CREDENTIALS_JSON"
+            missing=1
+          fi          
           if [ -z "${{ secrets.DOTENV }}" ]; then
             echo "❌ Falta DOTENV"
             missing=1
@@ -82,13 +86,14 @@ jobs:
               git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git /srv/ombu
             else
               echo "🔄 Actualizando repo existente..."
-              cd /srv/ombu
+              cd /srv/ombu              
               git reset --hard
               git pull https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git main
             fi
 
             # 🔑 Generar .env desde secret
             echo "${{ secrets.DOTENV }}" > /srv/ombu/.env
+            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > /srv/ombu/credentials/service_account.json
 
             cd /srv/ombu
             echo "🐳 Deploy con Docker Compose..."
