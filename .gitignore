@@ -1,1 +1,3 @@
 .env
+credentials/service_account.json
+credentials/credentials.json

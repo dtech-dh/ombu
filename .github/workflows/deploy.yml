@@ -11,49 +11,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 📦 Checkout del código fuente
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ✅ Validación de secrets
+      # ✅ Validación de secrets antes de continuar
       - name: Validar secrets del repositorio
         run: |
           missing=0
-          if [ -z "${{ secrets.DOCKER_HUB_USER }}" ]; then
-            echo "❌ Falta DOCKER_HUB_USER"
-            missing=1
-          fi
-          if [ -z "${{ secrets.DOCKER_HUB_TOKEN }}" ]; then
-            echo "❌ Falta DOCKER_HUB_TOKEN"
-            missing=1
-          fi
-          if [ -z "${{ secrets.DO_HOST }}" ]; then
-            echo "❌ Falta DO_HOST"
-            missing=1
-          fi
-          if [ -z "${{ secrets.DO_USER }}" ]; then
-            echo "❌ Falta DO_USER"
-            missing=1
-          fi
-          if [ -z "${{ secrets.DO_SSH_KEY }}" ]; then
-            echo "❌ Falta DO_SSH_KEY"
-            missing=1
-          fi
-          if [ -z "${{ secrets.GH_PAT }}" ]; then
-            echo "❌ Falta GH_PAT"
-            missing=1
-          fi
-          if [ -z "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" ]; then
-            echo "❌ Falta GOOGLE_CREDENTIALS_JSON"
-            missing=1
-          fi          
-          if [ -z "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" ]; then
-            echo "❌ Falta GOOGLE_SERVICE_ACCOUNT"
-            missing=1
-          fi             
-          if [ -z "${{ secrets.DOTENV }}" ]; then
-            echo "❌ Falta DOTENV"
-            missing=1
-          fi
+          for secret in DOCKER_HUB_USER DOCKER_HUB_TOKEN DO_HOST DO_USER DO_SSH_KEY GH_PAT DOTENV GOOGLE_CREDENTIALS_JSON; do
+            if [ -z "${{ secrets[$secret] }}" ]; then
+              echo "❌ Falta $secret"
+              missing=1
+            fi
+          done
           if [ $missing -ne 0 ]; then
             echo "❌ Faltan variables obligatorias, abortando workflow."
             exit 1
@@ -67,7 +38,7 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      # 🐳 Build & Push imagen a Docker Hub
+      # 🐳 Build & Push de la imagen
       - name: Build & Push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -75,7 +46,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_HUB_USER }}/ombu:latest
 
-      # 🚀 Deploy remoto en Droplet
+      # 🚀 Deploy remoto en Droplet DigitalOcean
       - name: Deploy to Droplet
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -83,24 +54,41 @@ jobs:
           username: ${{ secrets.DO_USER }}
           key: ${{ secrets.DO_SSH_KEY }}
           script: |
-            mkdir -p /srv/ombu
+            set -e
+            echo "📦 Iniciando despliegue remoto en /srv/ombu..."
+
+            # Crear estructura si no existe
+            mkdir -p /srv/ombu/credentials
+            cd /srv/ombu
+
+            # Clonar o actualizar el repo
             if [ ! -d "/srv/ombu/.git" ]; then
-              echo "📥 Primera implementación: clonando repo con GH_PAT..."
+              echo "📥 Primera implementación: clonando repo..."
               rm -rf /srv/ombu
               git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git /srv/ombu
             else
               echo "🔄 Actualizando repo existente..."
-              cd /srv/ombu              
+              cd /srv/ombu
               git reset --hard
               git pull https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git main
             fi
 
-            # 🔑 Generar .env desde secret
+            # Escribir el archivo .env
+            echo "📝 Generando archivo .env"
             echo "${{ secrets.DOTENV }}" > /srv/ombu/.env
-            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > /srv/ombu/credentials/credentials.json
-            echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" > /srv/ombu/credentials/service_account.json
 
-            cd /srv/ombu
-            echo "🐳 Deploy con Docker Compose..."
+            # Escribir credenciales de Google (Service Account)
+            echo "🔑 Generando service_account.json"
+            echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > /srv/ombu/credentials/service_account.json
+
+            # Verificar que el archivo sea válido
+            if [ ! -s /srv/ombu/credentials/service_account.json ]; then
+              echo "❌ Error: el archivo service_account.json está vacío o no existe"
+              exit 1
+            fi
+
+            echo "🐳 Ejecutando docker compose..."
             docker compose pull
-            docker compose up -d
+            docker compose up -d --build
+
+            echo "✅ Despliegue completado correctamente."
