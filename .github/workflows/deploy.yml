@@ -11,34 +11,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 📦 Checkout del código fuente
+      # 📦 Checkout del código
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ✅ Validación de secrets antes de continuar
+      # ✅ Validación manual de secrets (sin bucle dinámico)
       - name: Validar secrets del repositorio
         run: |
           missing=0
-          for secret in DOCKER_HUB_USER DOCKER_HUB_TOKEN DO_HOST DO_USER DO_SSH_KEY GH_PAT DOTENV GOOGLE_CREDENTIALS_JSON; do
-            if [ -z "${{ secrets[$secret] }}" ]; then
-              echo "❌ Falta $secret"
-              missing=1
-            fi
-          done
+          if [ -z "${{ secrets.DOCKER_HUB_USER }}" ]; then echo "❌ Falta DOCKER_HUB_USER"; missing=1; fi
+          if [ -z "${{ secrets.DOCKER_HUB_TOKEN }}" ]; then echo "❌ Falta DOCKER_HUB_TOKEN"; missing=1; fi
+          if [ -z "${{ secrets.DO_HOST }}" ]; then echo "❌ Falta DO_HOST"; missing=1; fi
+          if [ -z "${{ secrets.DO_USER }}" ]; then echo "❌ Falta DO_USER"; missing=1; fi
+          if [ -z "${{ secrets.DO_SSH_KEY }}" ]; then echo "❌ Falta DO_SSH_KEY"; missing=1; fi
+          if [ -z "${{ secrets.GH_PAT }}" ]; then echo "❌ Falta GH_PAT"; missing=1; fi
+          if [ -z "${{ secrets.DOTENV }}" ]; then echo "❌ Falta DOTENV"; missing=1; fi
+          if [ -z "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" ]; then echo "❌ Falta GOOGLE_CREDENTIALS_JSON"; missing=1; fi
+
           if [ $missing -ne 0 ]; then
             echo "❌ Faltan variables obligatorias, abortando workflow."
             exit 1
           fi
-          echo "✅ Todos los secrets requeridos están definidos"
+          echo "✅ Todos los secrets requeridos están definidos correctamente."
 
-      # 🔑 Login a Docker Hub
+      # 🔑 Login en Docker Hub
       - name: Log in en Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USER }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      # 🐳 Build & Push de la imagen
+      # 🐳 Build & Push de la imagen a Docker Hub
       - name: Build & Push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -46,7 +49,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_HUB_USER }}/ombu:latest
 
-      # 🚀 Deploy remoto en Droplet DigitalOcean
+      # 🚀 Deploy remoto en DigitalOcean
       - name: Deploy to Droplet
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -63,7 +66,7 @@ jobs:
 
             # Clonar o actualizar el repo
             if [ ! -d "/srv/ombu/.git" ]; then
-              echo "📥 Primera implementación: clonando repo..."
+              echo "📥 Clonando repo..."
               rm -rf /srv/ombu
               git clone https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git /srv/ombu
             else
@@ -73,21 +76,21 @@ jobs:
               git pull https://oauth2:${{ secrets.GH_PAT }}@github.com/dtech-dh/ombu.git main
             fi
 
-            # Escribir el archivo .env
-            echo "📝 Generando archivo .env"
+            # Crear .env
+            echo "📝 Generando .env"
             echo "${{ secrets.DOTENV }}" > /srv/ombu/.env
 
-            # Escribir credenciales de Google (Service Account)
+            # Crear credenciales Google
             echo "🔑 Generando service_account.json"
             echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > /srv/ombu/credentials/service_account.json
 
-            # Verificar que el archivo sea válido
+            # Validar que exista y tenga contenido
             if [ ! -s /srv/ombu/credentials/service_account.json ]; then
               echo "❌ Error: el archivo service_account.json está vacío o no existe"
               exit 1
             fi
 
-            echo "🐳 Ejecutando docker compose..."
+            echo "🐳 Deploy con Docker Compose..."
             docker compose pull
             docker compose up -d --build
 
