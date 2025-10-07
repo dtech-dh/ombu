@@ -46,6 +46,10 @@ jobs:
             echo "❌ Falta GOOGLE_CREDENTIALS_JSON"
             missing=1
           fi          
+          if [ -z "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" ]; then
+            echo "❌ Falta GOOGLE_SERVICE_ACCOUNT"
+            missing=1
+          fi             
           if [ -z "${{ secrets.DOTENV }}" ]; then
             echo "❌ Falta DOTENV"
             missing=1
@@ -93,7 +97,8 @@ jobs:
 
             # 🔑 Generar .env desde secret
             echo "${{ secrets.DOTENV }}" > /srv/ombu/.env
-            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > /srv/ombu/credentials/service_account.json
+            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" > /srv/ombu/credentials/credentials.json
+            echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" > /srv/ombu/credentials/service_account.json
 
             cd /srv/ombu
             echo "🐳 Deploy con Docker Compose..."
